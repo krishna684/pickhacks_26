@@ -152,29 +152,40 @@ export default function App() {
   };
 
   const findRoutes = async () => {
-    if (!startPoint.value || !endPoint.value) {
+    const fromValue = startPoint.value.trim();
+    const toValue = endPoint.value.trim();
+
+    if (!fromValue || !toValue) {
       toast.error("Please enter both start and end points");
       return;
     }
-    if (!startPoint.isValid || !endPoint.isValid) {
-      toast.error("Please select a valid location from the dropdown suggestions.");
-      return;
-    }
+
     setIsFindingRoutes(true);
     try {
       const res = await fetch('/api/routes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: startPoint.value, to: endPoint.value })
+        body: JSON.stringify({ from: fromValue, to: toValue })
       });
-      if (!res.ok) throw new Error("Failed to fetch routes");
+
+      if (!res.ok) {
+        let message = 'Could not calculate routes. Please try again.';
+        try {
+          const errorBody = await res.json();
+          message = errorBody?.error?.message || message;
+        } catch {
+          // no-op
+        }
+        throw new Error(message);
+      }
+
       const data = await res.json();
       setRoutes(data);
       if (isMobile) setIsSidebarOpen(true);
       toast.success("Routes calculated successfully");
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to find routes", e);
-      toast.error("Could not calculate routes. Please try again.");
+      toast.error(e?.message || "Could not calculate routes. Please try again.");
     } finally {
       setIsFindingRoutes(false);
     }
@@ -229,11 +240,20 @@ export default function App() {
           safest: { time: routes.safest.time, segments: routes.safest.segments.map(s => s.name) }
         }),
       });
-      if (!res.ok) throw new Error("AI explanation failed");
+      if (!res.ok) {
+        let message = 'AI was unable to generate an explanation right now.';
+        try {
+          const errorBody = await res.json();
+          message = errorBody?.error?.message || errorBody?.message || message;
+        } catch {
+          // keep default
+        }
+        throw new Error(message);
+      }
       const data = await res.json();
       setExplanation(data.explanation);
-    } catch (e) {
-      toast.error("AI was unable to generate an explanation right now.");
+    } catch (e: any) {
+      toast.error(e?.message || "AI was unable to generate an explanation right now.");
     } finally {
       setIsExplaining(false);
     }
@@ -243,12 +263,21 @@ export default function App() {
     setIsBriefing(true);
     try {
       const res = await fetch('/api/ai/daily-brief', { method: 'POST', headers: buildApiHeaders() });
-      if (!res.ok) throw new Error("Brief generation failed");
+      if (!res.ok) {
+        let message = 'Failed to generate daily brief.';
+        try {
+          const errorBody = await res.json();
+          message = errorBody?.error?.message || errorBody?.message || message;
+        } catch {
+          // keep default message
+        }
+        throw new Error(message);
+      }
       const data = await res.json();
       setDailyBrief(data.brief);
       toast.success("Daily brief generated");
-    } catch (e) {
-      toast.error("Failed to generate daily brief.");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to generate daily brief.");
     } finally {
       setIsBriefing(false);
     }
@@ -503,23 +532,34 @@ export default function App() {
 
   if (isAuthLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#F9F9F8]">
-        <div className="text-stone-600 font-semibold">Loading authentication...</div>
+      <div className="h-screen flex items-center justify-center bg-surface-50">
+        <div className="text-stone-600 font-semibold animate-pulse tracking-wide">Loading CivicSafe AI...</div>
       </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#F9F9F8] p-6">
-        <div className="w-full max-w-md bg-white border border-stone-200 rounded-3xl p-8 shadow-xl text-center">
-          <h1 className="text-2xl font-bold text-stone-800 mb-2">CivicSafe AI</h1>
-          <p className="text-sm text-stone-500 mb-6">Sign in to access citizen, operator, or planner tools.</p>
+      <div className="h-screen flex items-center justify-center bg-surface-50 relative overflow-hidden p-6">
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-brand-500/20 rounded-full blur-[100px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-500/20 rounded-full blur-[120px]" />
+        </div>
+        <div className="w-full max-w-md glass-panel rounded-[2.5rem] p-10 text-center relative z-10 border-white/60">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="inline-flex items-center justify-center w-20 h-20 bg-brand-600 rounded-3xl text-white shadow-xl shadow-brand-500/30 mb-8"
+          >
+            <Shield size={36} strokeWidth={2.5} />
+          </motion.div>
+          <h1 className="text-4xl font-extrabold text-surface-900 tracking-tight mb-3">CivicSafe <span className="text-brand-600">AI</span></h1>
+          <p className="text-sm font-medium text-surface-800/60 mb-10">Sign in to access your city safety dashboard.</p>
           <button
             onClick={login}
-            className="w-full py-3 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition-colors"
+            className="w-full py-4 btn-primary text-base tracking-wide"
           >
-            Sign In
+            Sign In to Dashboard
           </button>
         </div>
       </div>
@@ -527,13 +567,13 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#F9F9F8] overflow-hidden">
+    <div className="flex flex-col h-screen bg-surface-50 overflow-hidden font-sans">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 md:px-8 py-4 bg-white/70 backdrop-blur-md border-b border-stone-200/60 z-50 sticky top-0">
-        <div className="flex items-center gap-3 md:gap-4">
+      <header className="flex items-center justify-between px-6 md:px-10 py-4 glass-header z-50 sticky top-0">
+        <div className="flex items-center gap-3 md:gap-5">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 -ml-2 text-stone-500 hover:bg-stone-100 rounded-xl md:hidden transition-colors"
+            className="p-2 -ml-2 text-stone-500 hover:bg-stone-100/80 rounded-xl md:hidden transition-colors"
           >
             {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -541,12 +581,12 @@ export default function App() {
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="p-2 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-200"
+              className="p-2.5 bg-brand-600 rounded-xl text-white shadow-lg shadow-brand-500/30"
             >
-              <Shield size={22} />
+              <Shield size={24} />
             </motion.div>
-            <h1 className="text-xl font-bold tracking-tight text-stone-800 hidden sm:block">
-              CivicSafe <span className="text-emerald-600">AI</span>
+            <h1 className="text-xl font-extrabold tracking-tight text-surface-900 hidden sm:block">
+              CivicSafe <span className="text-brand-600">AI</span>
             </h1>
           </div>
         </div>
@@ -597,12 +637,12 @@ export default function App() {
             )}
           </div>
 
-          {isMock && setMockRole && (
+          {setMockRole && (
             <select
               value={role}
               onChange={(event) => setMockRole(event.target.value as 'citizen' | 'operator' | 'planner' | 'admin')}
               className="hidden md:block px-3 py-2 rounded-xl border border-stone-200 bg-white text-xs font-semibold text-stone-700"
-              title="Mock role selector"
+              title={isMock ? "Mock role selector" : "Role override selector"}
             >
               <option value="citizen">Citizen</option>
               <option value="operator">Operator</option>
@@ -630,10 +670,10 @@ export default function App() {
               exit={isMobile ? { y: '100%' } : { x: -400, opacity: 0 }}
               transition={{ type: 'spring', damping: 28, stiffness: 220 }}
               className={cn(
-                "bg-white/90 backdrop-blur-xl border-stone-200/60 z-40 overflow-y-auto",
+                "glass-panel backdrop-blur-3xl z-40 overflow-y-auto",
                 isMobile
-                  ? "absolute inset-x-0 bottom-0 top-1/4 rounded-t-[2.5rem] border-t shadow-[0_-20px_50px_-12px_rgba(0,0,0,0.1)]"
-                  : "w-[26rem] border-r relative shadow-2xl shadow-stone-200/50"
+                  ? "absolute inset-x-0 bottom-0 top-1/4 rounded-t-[2.5rem] border-b-0"
+                  : "w-[26rem] h-full relative"
               )}
             >
               {isMobile && (
@@ -663,12 +703,10 @@ export default function App() {
                           onChange={(val: string, isValid: boolean) => setEndPoint({ value: val, isValid })}
                           icon={ArrowRight}
                         />
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <button
                           onClick={findRoutes}
                           disabled={isFindingRoutes}
-                          className="w-full py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
+                          className="w-full py-4 btn-primary flex items-center justify-center gap-2 mt-2"
                         >
                           {isFindingRoutes ? (
                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -678,7 +716,7 @@ export default function App() {
                               Find Routes
                             </>
                           )}
-                        </motion.button>
+                        </button>
                       </div>
                     </div>
 
@@ -1135,7 +1173,7 @@ export default function App() {
         {/* Map Area */}
         <div className="flex-1 relative z-0">
           <MapContainer
-            center={[40.7128, -74.0060]}
+            center={[41.8781, -87.6298]}
             zoom={15}
             className="w-full h-full"
             zoomControl={!isMobile}
@@ -1438,24 +1476,49 @@ function RouteFocus({ routes, activeRouteType }: { routes: any, activeRouteType:
 }
 
 function LocationInput({ value, onChange, placeholder, icon: Icon }: any) {
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<Array<{ label: string; lat: number; lng: number }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!value || value.length < 3 || !showSuggestions) {
       setSuggestions([]);
+      setIsLoading(false);
       return;
     }
+
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
+      setIsLoading(true);
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5`);
+        const res = await fetch(`/api/locations/autocomplete?q=${encodeURIComponent(value)}&limit=6`, {
+          signal: controller.signal,
+        });
         const data = await res.json();
-        setSuggestions(data);
+        const normalized = Array.isArray(data)
+          ? data
+            .filter((item) => item && typeof item.label === 'string')
+            .map((item) => ({
+              label: item.label,
+              lat: Number(item.lat),
+              lng: Number(item.lng),
+            }))
+          : [];
+        setSuggestions(normalized);
       } catch (e) {
-        console.error(e);
+        if (!(e instanceof DOMException && e.name === 'AbortError')) {
+          console.error(e);
+          setSuggestions([]);
+        }
+      } finally {
+        setIsLoading(false);
       }
     }, 500);
-    return () => clearTimeout(timer);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [value, showSuggestions]);
 
   return (
@@ -1482,13 +1545,25 @@ function LocationInput({ value, onChange, placeholder, icon: Icon }: any) {
               className="px-4 py-3 hover:bg-stone-50 cursor-pointer text-sm text-stone-700 border-b border-stone-100 last:border-0"
               onMouseDown={(e) => {
                 e.preventDefault(); // Prevent input blur before click fires
-                onChange(s.display_name, true);
+                onChange(s.label, true);
                 setShowSuggestions(false);
               }}
             >
-              {s.display_name}
+              {s.label}
             </div>
           ))}
+        </div>
+      )}
+
+      {showSuggestions && isLoading && (
+        <div className="absolute z-50 w-full mt-2 bg-white border border-stone-200 rounded-xl shadow-lg p-3 text-sm text-stone-500">
+          Searching locations...
+        </div>
+      )}
+
+      {showSuggestions && !isLoading && value.length >= 3 && suggestions.length === 0 && (
+        <div className="absolute z-50 w-full mt-2 bg-white border border-stone-200 rounded-xl shadow-lg p-3 text-sm text-stone-500">
+          No matching locations found.
         </div>
       )}
     </div>

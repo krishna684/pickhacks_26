@@ -40,26 +40,59 @@ function Auth0BackedProvider({ children }: { children: React.ReactNode }) {
     logout: auth0Logout,
   } = useAuth0();
 
+  const [roleOverride, setRoleOverrideState] = useState<AppRole | null>(() => {
+    const saved = localStorage.getItem('civicsafe_role_override');
+    if (saved === 'citizen' || saved === 'operator' || saved === 'planner' || saved === 'admin') {
+      return saved;
+    }
+    return null;
+  });
+
+  const [forceLoggedOut, setForceLoggedOut] = useState<boolean>(() => {
+    return localStorage.getItem('civicsafe_force_logged_out') === 'true';
+  });
+
+  const setMockRole = (nextRole: AppRole) => {
+    setRoleOverrideState(nextRole);
+    localStorage.setItem('civicsafe_role_override', nextRole);
+  };
+
   const roleClaimKey = import.meta.env.VITE_AUTH0_ROLE_CLAIM || 'https://civicsafe.app/role';
   const rawRole = user?.[roleClaimKey as keyof typeof user];
   const roleValue = Array.isArray(rawRole) ? rawRole[0] : rawRole;
-  const role = normalizeRole(roleValue);
+  const role = roleOverride ?? normalizeRole(roleValue);
+
+  const performLogout = () => {
+    localStorage.removeItem('civicsafe_role_override');
+    setRoleOverrideState(null);
+
+    localStorage.setItem('civicsafe_force_logged_out', 'true');
+    setForceLoggedOut(true);
+
+    (auth0Logout as unknown as (options?: unknown) => void)({ localOnly: true });
+  };
+
+  const performLogin = () => {
+    localStorage.removeItem('civicsafe_force_logged_out');
+    setForceLoggedOut(false);
+    loginWithRedirect();
+  };
+
+  const effectiveIsAuthenticated = isAuthenticated && !forceLoggedOut;
 
   const value: AuthContextValue = useMemo(
     () => ({
       isLoading,
-      isAuthenticated,
+      isAuthenticated: effectiveIsAuthenticated,
       isMock: false,
       userName: user?.name || user?.email,
       role,
-      login: () => loginWithRedirect(),
-      logout: () =>
-        auth0Logout({
-          logoutParams: { returnTo: window.location.origin },
-        }),
+      login: performLogin,
+      logout: performLogout,
+      setMockRole,
       canAccessMode: (mode: ViewMode) => canAccessModeForRole(role, mode),
     }),
-    [auth0Logout, isAuthenticated, isLoading, loginWithRedirect, role, user?.email, user?.name]
+    [effectiveIsAuthenticated, isLoading, role, user?.email, user?.name]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

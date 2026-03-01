@@ -13,3 +13,15 @@ db_credentials.txt
 # Local database artifacts
 *.db
 *.db-*
+
+# IDE / editor files
+.vscode/
+.idea/
+*.iml
+*.suo
+*.user
+*.userossc
+*.sln.docstates
+
+# Kiro workspace artifacts
+.kiro/

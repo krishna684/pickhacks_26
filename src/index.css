@@ -1,59 +1,78 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-inter: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-brand-50: #ecfdf5;
-  --color-brand-100: #d1fae5;
-  --color-brand-500: #10b981;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+
+  --color-surface-50: #fafaf9;
+  --color-surface-100: #f5f5f4;
+  --color-surface-800: #292524;
+  --color-surface-900: #1c1917;
 }
 
 @layer base {
   body {
-    @apply font-sans bg-[#F9F9F8] text-stone-900 antialiased;
+    @apply font-sans bg-surface-50 text-surface-900 antialiased selection:bg-brand-500/30 selection:text-brand-700;
   }
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+    @apply bg-white/70 backdrop-blur-2xl border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.04)] ring-1 ring-black/5;
+  }
+  
+  .glass-header {
+    @apply bg-white/80 backdrop-blur-xl border-b border-stone-200/50 shadow-sm;
   }
   
   .card-hover {
-    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5;
+    @apply transition-all duration-500 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)] hover:-translate-y-1 hover:border-brand-500/30;
+  }
+  
+  .btn-primary {
+    @apply bg-brand-600 text-white font-bold rounded-2xl hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/30 active:scale-95;
   }
 }
 
 .leaflet-container {
   width: 100%;
   height: 100%;
-  @apply grayscale-[0.2] contrast-[1.1];
+}
+
+.leaflet-layer {
+  filter: grayscale(0.15) contrast(1.1) opacity(0.9);
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-stone-200 rounded-full hover:bg-stone-300 transition-colors;
+  @apply bg-stone-300 rounded-full hover:bg-stone-400 transition-colors;
 }
 
 .markdown-body {
-  @apply text-sm leading-relaxed;
+  @apply text-sm leading-relaxed font-inter;
 }
 .markdown-body h1, .markdown-body h2, .markdown-body h3 {
-  @apply font-bold mt-4 mb-2;
+  @apply font-bold mt-4 mb-2 tracking-tight;
 }
 .markdown-body p {
-  @apply mb-3;
+  @apply mb-3 text-stone-600;
 }
 .markdown-body ul {
   @apply list-disc pl-5 mb-3;

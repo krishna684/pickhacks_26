@@ -6,9 +6,12 @@ import { fileURLToPath } from "url";
 import type { NextFunction, Request, Response } from "express";
 import dotenv from "dotenv";
 import { MongoClient, Db } from "mongodb";
+import Database from "better-sqlite3";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
+
+const sqliteDb = new Database("civicsafe.db");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,10 +167,7 @@ function scoreSegment(segment: { base_safety_score: number; lighting: number; cr
 }
 
 async function seedSegmentsIfEmpty() {
-  const count = await db.collection("segments").countDocuments();
-  if (count > 0) return;
-
-  await db.collection("segments").insertMany([
+  const chicagoSegments = [
     {
       id: "seg_1",
       name: "Wacker Dr & State St",
@@ -204,18 +204,98 @@ async function seedSegmentsIfEmpty() {
       crosswalk: 0,
       complaint_count: 3,
     },
-  ]);
+    {
+      id: "seg_5",
+      name: "Clark St & Lake St",
+      geometry: [[41.8856, -87.6307], [41.8867, -87.6304]],
+      base_safety_score: 73,
+      lighting: 1,
+      crosswalk: 1,
+      complaint_count: 2,
+    },
+    {
+      id: "seg_6",
+      name: "LaSalle St & Washington Blvd",
+      geometry: [[41.8831, -87.6323], [41.8822, -87.632]],
+      base_safety_score: 69,
+      lighting: 1,
+      crosswalk: 1,
+      complaint_count: 2,
+    },
+    {
+      id: "seg_7",
+      name: "Canal St Union Station Approach",
+      geometry: [[41.8784, -87.6404], [41.8791, -87.639]],
+      base_safety_score: 58,
+      lighting: 1,
+      crosswalk: 0,
+      complaint_count: 4,
+    },
+    {
+      id: "seg_8",
+      name: "Roosevelt Rd & Michigan Ave",
+      geometry: [[41.8672, -87.6246], [41.8664, -87.6234]],
+      base_safety_score: 66,
+      lighting: 1,
+      crosswalk: 1,
+      complaint_count: 3,
+    },
+    {
+      id: "seg_9",
+      name: "Halsted St & Madison St",
+      geometry: [[41.8817, -87.6478], [41.8825, -87.6474]],
+      base_safety_score: 62,
+      lighting: 1,
+      crosswalk: 0,
+      complaint_count: 4,
+    },
+    {
+      id: "seg_10",
+      name: "Fullerton Ave & Sheffield Ave",
+      geometry: [[41.9258, -87.6537], [41.9251, -87.6528]],
+      base_safety_score: 71,
+      lighting: 1,
+      crosswalk: 1,
+      complaint_count: 2,
+    },
+    {
+      id: "seg_11",
+      name: "Hyde Park 53rd St Corridor",
+      geometry: [[41.7993, -87.5876], [41.7999, -87.5859]],
+      base_safety_score: 76,
+      lighting: 1,
+      crosswalk: 1,
+      complaint_count: 2,
+    },
+    {
+      id: "seg_12",
+      name: "Pilsen 18th St & Blue Island",
+      geometry: [[41.8578, -87.6618], [41.8572, -87.6599]],
+      base_safety_score: 61,
+      lighting: 0,
+      crosswalk: 1,
+      complaint_count: 4,
+    },
+  ];
+
+  await db.collection("segments").bulkWrite(
+    chicagoSegments.map((segment) => ({
+      updateOne: {
+        filter: { id: segment.id },
+        update: { $set: segment },
+        upsert: true,
+      },
+    }))
+  );
 }
 
 async function seedComplaintsIfEmpty() {
   const count = await db.collection("complaints").countDocuments();
-  if (count > 0) return;
+  if (count >= 12) return;
 
   const now = Date.now();
-
-  await db.collection("complaints").insertMany([
+  const seedComplaints = [
     {
-      id: randomId("cmp_"),
       lat: 41.8829,
       lng: -87.6276,
       type: "Dark Area",
@@ -229,7 +309,6 @@ async function seedComplaintsIfEmpty() {
       updated_at: new Date(now - 1000 * 60 * 35).toISOString(),
     },
     {
-      id: randomId("cmp_"),
       lat: 41.8864,
       lng: -87.6292,
       type: "Obstruction",
@@ -243,7 +322,6 @@ async function seedComplaintsIfEmpty() {
       updated_at: new Date(now - 1000 * 60 * 70).toISOString(),
     },
     {
-      id: randomId("cmp_"),
       lat: 41.889,
       lng: -87.6236,
       type: "No Sidewalk",
@@ -256,7 +334,93 @@ async function seedComplaintsIfEmpty() {
       created_at: new Date(now - 1000 * 60 * 220).toISOString(),
       updated_at: new Date(now - 1000 * 60 * 90).toISOString(),
     },
-  ]);
+    {
+      lat: 41.8789,
+      lng: -87.6408,
+      type: "Crosswalk Signal",
+      description: "Pedestrian crossing signal timing is too short near Union Station west entrance.",
+      ai_urgency: "Medium",
+      ai_summary: "Short crossing windows are causing pedestrians to remain in roadway after signal change.",
+      status: "open",
+      assigned_department: "Transportation",
+      response_note: "Signal timing review requested.",
+      created_at: new Date(now - 1000 * 60 * 190).toISOString(),
+      updated_at: new Date(now - 1000 * 60 * 160).toISOString(),
+    },
+    {
+      lat: 41.867,
+      lng: -87.6242,
+      type: "Dark Area",
+      description: "Streetlights near Roosevelt CTA underpass are partially out after midnight.",
+      ai_urgency: "High",
+      ai_summary: "Reduced nighttime lighting near transit access increases perceived and actual safety risk.",
+      status: "in_progress",
+      assigned_department: "Electrical Operations",
+      response_note: "Lamp replacement work order opened.",
+      created_at: new Date(now - 1000 * 60 * 260).toISOString(),
+      updated_at: new Date(now - 1000 * 60 * 140).toISOString(),
+    },
+    {
+      lat: 41.9254,
+      lng: -87.6531,
+      type: "Obstruction",
+      description: "Delivery trucks repeatedly block sidewalk curb ramp on Fullerton during evening hours.",
+      ai_urgency: "Medium",
+      ai_summary: "Recurring ramp obstruction is forcing wheelchair users into traffic lane.",
+      status: "open",
+      assigned_department: "Parking Enforcement",
+      response_note: "Targeted enforcement requested for evening window.",
+      created_at: new Date(now - 1000 * 60 * 300).toISOString(),
+      updated_at: new Date(now - 1000 * 60 * 210).toISOString(),
+    },
+    {
+      lat: 41.7996,
+      lng: -87.5868,
+      type: "No Sidewalk",
+      description: "Tree roots lifted sidewalk panels creating trip hazard near 53rd St bus stop.",
+      ai_urgency: "Medium",
+      ai_summary: "Uneven sidewalk sections near transit stop are creating persistent fall risk.",
+      status: "in_progress",
+      assigned_department: "Streets & Sanitation",
+      response_note: "Concrete crew inspection scheduled.",
+      created_at: new Date(now - 1000 * 60 * 340).toISOString(),
+      updated_at: new Date(now - 1000 * 60 * 200).toISOString(),
+    },
+    {
+      lat: 41.8575,
+      lng: -87.6609,
+      type: "Crosswalk Signal",
+      description: "Flashing pedestrian beacon at 18th St is not activating consistently.",
+      ai_urgency: "High",
+      ai_summary: "Intermittent crossing beacon activation significantly reduces intersection visibility for drivers.",
+      status: "open",
+      assigned_department: "Transportation",
+      response_note: "Signal maintenance team dispatched.",
+      created_at: new Date(now - 1000 * 60 * 380).toISOString(),
+      updated_at: new Date(now - 1000 * 60 * 240).toISOString(),
+    },
+    {
+      lat: 41.8822,
+      lng: -87.647,
+      type: "Dark Area",
+      description: "Alley-adjacent walkway near Halsted has repeated reports of poor nighttime visibility.",
+      ai_urgency: "Medium",
+      ai_summary: "Low-light corridor adjacent to mixed-use buildings contributes to reported late-night safety concerns.",
+      status: "resolved",
+      assigned_department: "Electrical Operations",
+      response_note: "New LED fixtures installed and tested.",
+      created_at: new Date(now - 1000 * 60 * 460).toISOString(),
+      updated_at: new Date(now - 1000 * 60 * 150).toISOString(),
+    },
+  ];
+
+  const complaintsToInsert = seedComplaints
+    .slice(0, Math.max(0, 12 - count))
+    .map((complaint) => ({ id: randomId("cmp_"), ...complaint }));
+
+  if (complaintsToInsert.length > 0) {
+    await db.collection("complaints").insertMany(complaintsToInsert);
+  }
 }
 
 async function seedPlannerScenariosIfEmpty() {
@@ -734,7 +898,7 @@ async function startServer() {
       return res.status(400).json(errorResponse("INVALID_WEBHOOK_URL", "targetUrl is required."));
     }
 
-    const id = randomId("wh_" );
+    const id = randomId("wh_");
     await db.collection("webhook_subscriptions").insertOne({
       id,
       name: name.trim(),
@@ -830,16 +994,48 @@ async function startServer() {
 
   app.post("/api/ai/route-explanation", async (req, res) => {
     const { fastest, safest } = req.body;
+
+    const fallbackExplanation = () => {
+      const fastestTime = typeof fastest?.time === "string" ? fastest.time : "N/A";
+      const safestTime = typeof safest?.time === "string" ? safest.time : "N/A";
+
+      const fastestSegments = Array.isArray(fastest?.segments) ? fastest.segments.length : 0;
+      const safestSegments = Array.isArray(safest?.segments) ? safest.segments.length : 0;
+
+      return [
+        `The safest route is selected to reduce exposure to higher-risk blocks, even if travel time is similar.`,
+        `Fastest route time: ${fastestTime}. Safest route time: ${safestTime}.`,
+        `Compared paths include ${fastestSegments} fastest segments vs ${safestSegments} safest segments.`,
+        `If you are walking at night or in unfamiliar areas, the safest option is generally the better choice.`,
+      ].join(" ");
+    };
+
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Explain why the \"Safest\" route is better than the \"Fastest\" route for a pedestrian.\nFastest Route Details: ${JSON.stringify(
-          fastest
-        )}\nSafest Route Details: ${JSON.stringify(safest)}\nKeep it concise and reassuring.`,
-      });
-      return res.json({ explanation: response.text });
+      const prompt = `Explain why the \"Safest\" route is better than the \"Fastest\" route for a pedestrian.\nFastest Route Details: ${JSON.stringify(
+        fastest
+      )}\nSafest Route Details: ${JSON.stringify(safest)}\nKeep it concise and reassuring.`;
+
+      const modelCandidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-3-flash-preview"];
+
+      for (const model of modelCandidates) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+          });
+
+          if (typeof response.text === "string" && response.text.trim().length > 0) {
+            return res.json({ explanation: response.text });
+          }
+        } catch (modelError) {
+          console.error(`Route explanation AI attempt failed for model ${model}:`, modelError);
+        }
+      }
+
+      return res.json({ explanation: fallbackExplanation(), source: "fallback" });
     } catch (error) {
-      return res.status(500).json({ error: "AI failed" });
+      console.error("Route explanation generation failed:", error);
+      return res.json({ explanation: fallbackExplanation(), source: "fallback" });
     }
   });
 
@@ -850,18 +1046,237 @@ async function startServer() {
       .project({ _id: 0 })
       .toArray();
 
+    const fallbackBrief = () => {
+      const total = complaints.length;
+      const byUrgency = complaints.reduce(
+        (accumulator, complaint: any) => {
+          const urgency = typeof complaint?.ai_urgency === "string" ? complaint.ai_urgency.toLowerCase() : "unknown";
+          if (urgency === "high") accumulator.high += 1;
+          else if (urgency === "medium") accumulator.medium += 1;
+          else accumulator.low += 1;
+          return accumulator;
+        },
+        { high: 0, medium: 0, low: 0 }
+      );
+
+      const byType = complaints.reduce((accumulator: Record<string, number>, complaint: any) => {
+        const type = typeof complaint?.type === "string" ? complaint.type : "Other";
+        accumulator[type] = (accumulator[type] || 0) + 1;
+        return accumulator;
+      }, {});
+
+      const topTypes = Object.entries(byType)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([type, count]) => `- ${type}: ${count}`)
+        .join("\n");
+
+      return [
+        "# Daily Safety Brief",
+        "",
+        `- Total complaints (last 24h): ${total}`,
+        `- High urgency: ${byUrgency.high}`,
+        `- Medium urgency: ${byUrgency.medium}`,
+        `- Low/Other urgency: ${byUrgency.low}`,
+        "",
+        "## Top Reported Issues",
+        topTypes || "- No complaints reported.",
+        "",
+        "## Immediate Actions",
+        "1. Prioritize field checks for high-urgency reports.",
+        "2. Dispatch crews to recurring hotspots by issue count.",
+        "3. Publish temporary pedestrian advisories for affected corridors.",
+      ].join("\n");
+    };
+
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Generate a daily safety brief for city operators based on these complaints:\n${JSON.stringify(
-          complaints
-        )}\nIdentify patterns, high-risk areas, and suggest 3 immediate actions. Use Markdown formatting.`,
-      });
-      return res.json({ brief: response.text });
+      const prompt = `Generate a daily safety brief for city operators based on these complaints:\n${JSON.stringify(
+        complaints
+      )}\nIdentify patterns, high-risk areas, and suggest 3 immediate actions. Use Markdown formatting.`;
+
+      const modelCandidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-3-flash-preview"];
+
+      for (const model of modelCandidates) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+          });
+
+          if (typeof response.text === "string" && response.text.trim().length > 0) {
+            return res.json({ brief: response.text });
+          }
+        } catch (modelError) {
+          console.error(`Daily brief AI attempt failed for model ${model}:`, modelError);
+        }
+      }
+
+      return res.json({ brief: fallbackBrief(), source: "fallback" });
     } catch (error) {
-      return res.status(500).json({ error: "AI failed" });
+      console.error("Daily brief generation failed:", error);
+      return res.json({ brief: fallbackBrief(), source: "fallback" });
     }
   });
+
+  app.get("/api/locations/autocomplete", async (req, res) => {
+    const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (query.length < 2) {
+      return res.json([]);
+    }
+
+    const limitRaw = Number(req.query.limit || 6);
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 10) : 6;
+
+    const mapNominatim = (rows: any[]) => {
+      return rows
+        .map((row) => {
+          const lat = Number(row?.lat);
+          const lng = Number(row?.lon);
+          const label = typeof row?.display_name === "string" ? row.display_name : "";
+          if (!isValidLatitude(lat) || !isValidLongitude(lng) || !label) return null;
+          return { label, lat, lng };
+        })
+        .filter((row): row is { label: string; lat: number; lng: number } => Boolean(row));
+    };
+
+    const mapPhoton = (rows: any[]) => {
+      return rows
+        .map((row) => {
+          const props = row?.properties || {};
+          const coords = row?.geometry?.coordinates;
+          const lng = Array.isArray(coords) ? Number(coords[0]) : NaN;
+          const lat = Array.isArray(coords) ? Number(coords[1]) : NaN;
+          const parts = [props?.name, props?.street, props?.city, props?.state, props?.country]
+            .filter((part) => typeof part === "string" && part.trim().length > 0)
+            .map((part) => String(part).trim());
+          const label = parts.join(", ");
+
+          if (!isValidLatitude(lat) || !isValidLongitude(lng) || !label) return null;
+          return { label, lat, lng };
+        })
+        .filter((row): row is { label: string; lat: number; lng: number } => Boolean(row));
+    };
+
+    try {
+      const viewbox = "-87.95,42.05,-87.50,41.60";
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+        `${query}, Chicago`
+      )}&format=jsonv2&addressdetails=1&limit=${limit}&viewbox=${viewbox}`;
+
+      const primary = await fetch(nominatimUrl, {
+        headers: {
+          "User-Agent": "CivicSafeAI/1.0",
+          "Accept-Language": "en-US,en;q=0.8",
+        },
+      });
+
+      if (primary.ok) {
+        const primaryData = await primary.json();
+        const mapped = mapNominatim(Array.isArray(primaryData) ? primaryData : []);
+        if (mapped.length > 0) {
+          return res.json(mapped.slice(0, limit));
+        }
+      }
+
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=${limit}&bbox=-87.95,41.60,-87.50,42.05`;
+      const secondary = await fetch(photonUrl, {
+        headers: { "User-Agent": "CivicSafeAI/1.0" },
+      });
+
+      if (secondary.ok) {
+        const secondaryData = await secondary.json();
+        const mapped = mapPhoton(Array.isArray(secondaryData?.features) ? secondaryData.features : []);
+        return res.json(mapped.slice(0, limit));
+      }
+
+      return res.json([]);
+    } catch (error) {
+      console.error("Autocomplete Error:", error);
+      return res.json([]);
+    }
+  });
+
+  // Priority Queue for Dijkstra
+  class PriorityQueue {
+    values: any[] = [];
+    enqueue(val: any, priority: number) {
+      this.values.push({ val, priority });
+      this.sort();
+    }
+    dequeue() { return this.values.shift(); }
+    sort() { this.values.sort((a, b) => a.priority - b.priority); }
+    isEmpty() { return this.values.length === 0; }
+  }
+
+  function getNearestNodes(lat: number, lon: number, limit = 10) {
+    return sqliteDb.prepare(`
+      SELECT id, 
+        ((lat - ?) * (lat - ?) + (lon - ?) * (lon - ?)) as dist_sq
+      FROM route_nodes
+      ORDER BY dist_sq ASC
+      LIMIT ?
+    `).all(lat, lat, lon, lon, limit) as any[];
+  }
+
+  function runDijkstra(startId: string, endId: string, isSafest: boolean) {
+    const nodes = new PriorityQueue();
+    const distances: Record<string, number> = {};
+    const previous: Record<string, { node: string, edge: any } | null> = {};
+
+    // The Loop is small (~2-3k edges) so load in memory
+    const allEdges = sqliteDb.prepare("SELECT * FROM route_edges").all() as any[];
+    const graph: Record<string, any[]> = {};
+
+    allEdges.forEach(e => {
+      if (!graph[e.source]) graph[e.source] = [];
+      graph[e.source].push(e);
+      if (distances[e.source] === undefined) distances[e.source] = Infinity;
+      if (distances[e.target] === undefined) distances[e.target] = Infinity;
+    });
+
+    if (distances[startId] === undefined || distances[endId] === undefined) return null;
+
+    distances[startId] = 0;
+    nodes.enqueue(startId, 0);
+    previous[startId] = null;
+
+    while (!nodes.isEmpty()) {
+      const smallest = nodes.dequeue();
+      if (!smallest) break;
+      const current = smallest.val;
+
+      if (current === endId) {
+        const pathEdges = [];
+        let curr = endId;
+        while (previous[curr]) {
+          const prevInfo = previous[curr]!;
+          pathEdges.push(prevInfo.edge);
+          curr = prevInfo.node;
+        }
+        return pathEdges.reverse();
+      }
+
+      if (smallest.priority <= distances[current] && graph[current]) {
+        for (const neighbor of graph[current]) {
+          let cost = neighbor.distance;
+          if (isSafest) {
+            const penalty = (100 - neighbor.safety_score) * 2;
+            cost += penalty;
+          }
+
+          const candidate = distances[current] + cost;
+          const nextNode = neighbor.target;
+
+          if (candidate < (distances[nextNode] ?? Infinity)) {
+            distances[nextNode] = candidate;
+            previous[nextNode] = { node: current, edge: neighbor };
+            nodes.enqueue(nextNode, candidate);
+          }
+        }
+      }
+    }
+    return null;
+  }
 
   app.post("/api/routes", async (req, res) => {
     const { from, to } = req.body as { from?: string; to?: string };
@@ -870,21 +1285,222 @@ async function startServer() {
       return res.status(400).json(errorResponse("INVALID_ROUTE_REQUEST", "from and to are required route endpoints."));
     }
 
-    const allSegments = await db.collection("segments").find({}).project({ _id: 0 }).toArray();
-    const safestSegments = allSegments.filter((segment: any) => scoreSegment(segment) >= 60);
+    try {
+      const geocode = async (query: string, bounded: boolean) => {
+        const viewbox = "-87.95,42.05,-87.50,41.60";
+        const suffix = bounded ? `&viewbox=${viewbox}&bounded=1` : "";
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1${suffix}`;
+        const response = await fetch(url, { headers: { "User-Agent": "CivicSafeAI/1.0" } });
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data?.[0] || null;
+      };
 
-    return res.json({
-      fastest: {
-        time: "12 min",
-        distance: "1.2 km",
-        segments: allSegments,
-      },
-      safest: {
-        time: "15 min",
-        distance: "1.5 km",
-        segments: safestSegments.length > 0 ? safestSegments : allSegments,
-      },
-    });
+      const formatDuration = (seconds: number) => `${Math.max(1, Math.round(seconds / 60))} min`;
+      const formatDistance = (meters: number) => (meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`);
+
+      const toLatLngGeometry = (coordinates: Array<[number, number]>) => {
+        return coordinates.map((point) => [point[1], point[0]] as [number, number]);
+      };
+
+      const buildRouteSignature = (coordinates: Array<[number, number]>) => {
+        if (coordinates.length === 0) return "empty";
+        const step = Math.max(1, Math.floor(coordinates.length / 8));
+        const parts: string[] = [];
+        for (let index = 0; index < coordinates.length; index += step) {
+          const [lon, lat] = coordinates[index];
+          parts.push(`${lat.toFixed(4)},${lon.toFixed(4)}`);
+        }
+        const [endLon, endLat] = coordinates[coordinates.length - 1];
+        parts.push(`${endLat.toFixed(4)},${endLon.toFixed(4)}`);
+        return parts.join("|");
+      };
+
+      const estimateComplaintHits = (
+        routeCoordinates: Array<[number, number]>,
+        complaints: Array<{ lat?: number; lng?: number }>
+      ) => {
+        const sampled = routeCoordinates.filter((_, index) => index % 8 === 0 || index === routeCoordinates.length - 1);
+        let hits = 0;
+
+        for (const complaint of complaints) {
+          const lat = complaint.lat;
+          const lng = complaint.lng;
+          if (!isValidLatitude(lat) || !isValidLongitude(lng)) continue;
+
+          for (const point of sampled) {
+            const pointLon = point[0];
+            const pointLat = point[1];
+            const distSq = Math.pow(pointLat - lat, 2) + Math.pow(pointLon - lng, 2);
+            if (distSq <= 0.000003) {
+              hits += 1;
+              break;
+            }
+          }
+        }
+
+        return hits;
+      };
+
+      const fetchOsrmRoute = async (waypoints: Array<{ lon: number; lat: number }>, alternatives: boolean) => {
+        const coordString = waypoints.map((point) => `${point.lon},${point.lat}`).join(";");
+        const url = `https://router.project-osrm.org/route/v1/foot/${coordString}?alternatives=${alternatives ? "true" : "false"}&steps=false&overview=full&geometries=geojson`;
+        const response = await fetch(url, { headers: { "User-Agent": "CivicSafeAI/1.0" } });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data?.routes) ? data.routes : [];
+      };
+
+      let fromResult = await geocode(from, true);
+      let toResult = await geocode(to, true);
+
+      if (!fromResult) fromResult = await geocode(`${from}, Chicago`, false);
+      if (!toResult) toResult = await geocode(`${to}, Chicago`, false);
+
+      if (!fromResult || !toResult) {
+        return res.status(404).json(errorResponse("NOT_FOUND", "Could not find one or both locations."));
+      }
+
+      const fromLon = Number(fromResult.lon);
+      const fromLat = Number(fromResult.lat);
+      const toLon = Number(toResult.lon);
+      const toLat = Number(toResult.lat);
+
+      if (!Number.isFinite(fromLon) || !Number.isFinite(fromLat) || !Number.isFinite(toLon) || !Number.isFinite(toLat)) {
+        return res.status(400).json(errorResponse("INVALID_GEOCODE_RESULT", "Could not parse route endpoints."));
+      }
+
+      const complaints = (await db.collection("complaints").find({}).project({ _id: 0, lat: 1, lng: 1 }).toArray()) as Array<{
+        lat?: number;
+        lng?: number;
+      }>;
+
+      const baseRoutes = await fetchOsrmRoute(
+        [
+          { lon: fromLon, lat: fromLat },
+          { lon: toLon, lat: toLat },
+        ],
+        true
+      );
+
+      const midLon = (fromLon + toLon) / 2;
+      const midLat = (fromLat + toLat) / 2;
+      const waypointOffsets: Array<[number, number]> = [
+        [0.0045, 0],
+        [-0.0045, 0],
+        [0, 0.0045],
+        [0, -0.0045],
+        [0.0035, 0.0035],
+        [0.0035, -0.0035],
+        [-0.0035, 0.0035],
+        [-0.0035, -0.0035],
+      ];
+
+      const waypointRoutesNested = await Promise.all(
+        waypointOffsets.map(async ([lonOffset, latOffset]) => {
+          const waypoint = { lon: midLon + lonOffset, lat: midLat + latOffset };
+          const routed = await fetchOsrmRoute(
+            [
+              { lon: fromLon, lat: fromLat },
+              waypoint,
+              { lon: toLon, lat: toLat },
+            ],
+            false
+          );
+          return routed;
+        })
+      );
+
+      const allRouteCandidates = [...baseRoutes, ...waypointRoutesNested.flat()];
+
+      const normalizedCandidates = allRouteCandidates
+        .map((route: any) => {
+          const coordinates = Array.isArray(route?.geometry?.coordinates)
+            ? (route.geometry.coordinates as Array<[number, number]>)
+            : [];
+          if (coordinates.length < 2) return null;
+
+          const duration = Number(route.duration || 0);
+          const distance = Number(route.distance || 0);
+          const complaintHits = estimateComplaintHits(coordinates, complaints);
+
+          return {
+            duration,
+            distance,
+            coordinates,
+            complaintHits,
+            signature: buildRouteSignature(coordinates),
+          };
+        })
+        .filter((route): route is {
+          duration: number;
+          distance: number;
+          coordinates: Array<[number, number]>;
+          complaintHits: number;
+          signature: string;
+        } => Boolean(route));
+
+      const deduped = Array.from(
+        new Map(normalizedCandidates.map((candidate) => [candidate.signature, candidate])).values()
+      );
+
+      if (deduped.length === 0) {
+        return res.status(404).json(errorResponse("NO_ROUTES", "No walkable route found between these points."));
+      }
+
+      const fastestRoute = [...deduped].sort((a, b) => a.duration - b.duration)[0];
+
+      const safestCandidates = [...deduped].sort((a, b) => {
+        if (a.complaintHits !== b.complaintHits) return a.complaintHits - b.complaintHits;
+        const extraA = Math.max(0, (a.duration - fastestRoute.duration) / 60);
+        const extraB = Math.max(0, (b.duration - fastestRoute.duration) / 60);
+        if (extraA !== extraB) return extraA - extraB;
+        return a.duration - b.duration;
+      });
+
+      let safestRoute = safestCandidates[0];
+      if (safestRoute.signature === fastestRoute.signature) {
+        const distinctSafer = safestCandidates.find((candidate) => candidate.signature !== fastestRoute.signature);
+        if (distinctSafer) safestRoute = distinctSafer;
+      }
+
+      const fastestSegment = {
+        id: randomId("route_fast_"),
+        name: "Fastest Route",
+        geometry: toLatLngGeometry(fastestRoute.coordinates),
+        base_safety_score: Math.max(0, 90 - fastestRoute.complaintHits * 10),
+        lighting: 1,
+        crosswalk: 1,
+        complaint_count: fastestRoute.complaintHits,
+      };
+
+      const safestSegment = {
+        id: randomId("route_safe_"),
+        name: "Safest Route",
+        geometry: toLatLngGeometry(safestRoute.coordinates),
+        base_safety_score: Math.max(0, 95 - safestRoute.complaintHits * 8),
+        lighting: 1,
+        crosswalk: 1,
+        complaint_count: safestRoute.complaintHits,
+      };
+
+      return res.json({
+        fastest: {
+          time: formatDuration(fastestRoute.duration),
+          distance: formatDistance(fastestRoute.distance),
+          segments: [fastestSegment]
+        },
+        safest: {
+          time: formatDuration(safestRoute.duration),
+          distance: formatDistance(safestRoute.distance),
+          segments: [safestSegment]
+        }
+      });
+
+    } catch (error: any) {
+      console.error("Routing Error:", error);
+      return res.status(500).json(errorResponse("SERVER_ERROR", error.message || "Failed to calculate routes."));
+    }
   });
 
   if (process.env.NODE_ENV !== "production") {
