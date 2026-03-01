@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { startServer } from "../server";
+import { startServer } from "../server.js";
 
 let appPromise: ReturnType<typeof startServer> | null = null;
 
