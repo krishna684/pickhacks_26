@@ -1,49 +1,66 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <h1>CivicSafe AI 🛡️</h1>
+  <p><strong>Safer routes for citizens, smarter operations for cities.</strong></p>
 </div>
 
-# Run and deploy your AI Studio app
+CivicSafe AI is a comprehensive urban safety platform designed to bridge the gap between citizen navigation and city infrastructure planning. 
 
-This contains everything you need to run your app locally.
+By ingesting real-world municipal data (such as historical crash reports and street-level infrastructure details) alongside real-time crowdsourced reports, CivicSafe provides a dynamic, data-driven approach to physical safety. 
 
-View your app in AI Studio: https://ai.studio/apps/9c5ba7f8-3bf0-43da-9da1-9b69955bf6f5
+## 🌟 Core Features & Modules
 
-## Run Locally
+CivicSafe is split into three distinct role-based views:
 
-**Prerequisites:**  Node.js
+### 1. Citizen Route Planner
+Traditional navigation apps optimize purely for speed. The CivicSafe Citizen view optimizes for **survival and comfort**.
+- **Custom Chicago Routing Engine:** We ingested real street segments and crash data from the Chicago Data Portal to build a local graph network (SQLite).
+- **Fastest vs. Safest Paths:** Instead of just OSRM vectors, our custom Dijkstra algorithm calculates a "Safest Route" by heavily weighting well-lit streets, crosswalks, and avoiding high-crash/high-complaint intersections.
+- **AI Safety Insights:** Powered by Gemini, the app generates a human-readable, reassuring explanation of *why* the Safest route was chosen based on the underlying infrastructure data.
 
+### 2. Operator Triage Center
+City dispatchers are often overwhelmed with a backlog of 311 calls and unstructured complaints.
+- **AI Triage:** When a citizen reports an issue on the map, Gemini automatically categorizes the text, determines the urgency (High/Medium/Low), and summarizes the hazard.
+- **Daily Briefs:** With one click, operators can generate an LLM-compiled Daily Safety Brief that identifies hotspot patterns and recommends 3 immediate dispatch actions for the day.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. (Optional) Configure Auth0 in `.env.local` for real authentication:
-   - `VITE_AUTH0_DOMAIN`
-   - `VITE_AUTH0_CLIENT_ID`
-   - `VITE_AUTH0_AUDIENCE` (if used)
-   - `VITE_AUTH0_ROLE_CLAIM` (defaults to `https://civicsafe.app/role`)
-4. Run the app:
-   `npm run dev`
+### 3. Urban Planner Workspace
+City planners need to know where to allocate infrastructure budgets for maximum impact.
+- **"What-If" Simulations:** Planners can click on any street segment in the city and digitally toggle on/off lighting or crosswalks.
+- **ROI Analytics:** The platform recalculates the block's safety score dynamically, estimates the construction cost, and allows planners to save and compare "Investment Scenarios" by a strict *Safety-per-Dollar* efficiency metric.
 
-### Auth Notes
+---
 
-- If Auth0 variables are not configured, the app runs in local mock auth mode.
-- In mock mode, use the role selector in the header to switch between `citizen`, `operator`, `planner`, and `admin`.
-- Backend role checks are enforced on sensitive endpoints:
-  - `PATCH /api/segments/:id/tune` -> `planner` or `admin`
-  - `PATCH /api/complaints/:id` -> `operator` or `admin`
-  - `POST /api/ai/daily-brief` -> `operator` or `admin`
+## 🛠️ How it Works & Tech Stack
 
-### Integration Endpoints
+This project was hand-built during the hackathon using a modern JS stack.
 
-- `GET /api/integrations/complaints/export?format=json|csv&status=open|in_progress|resolved&since=<ISO date>`
-  - Role: `operator` or `admin`
-  - Exports complaint data for downstream city systems.
-- `POST /api/integrations/incidents/import`
-  - Role: `admin`
-  - Imports external incident feed payloads into local store.
-- `GET/POST/PATCH /api/integrations/webhooks`
-  - Role: `admin`
-  - Manage webhook subscriptions for complaint created/updated events.
-- `GET /api/admin/audit-logs?limit=100`
-  - Role: `admin`
-  - Reads audit records for sensitive actions and data exports.
+* **Frontend:** React + Vite, styled with TailwindCSS (using advanced glassmorphism utilities) and Framer Motion for premium micro-animations. Mapping provided by `react-leaflet`.
+* **Backend:** Express & Node.js
+* **Routing Grapg:** We built our own local graph network using `better-sqlite3`. An ingestion script pulls down OSM boundaries and Chicago Crash Data, snaps them together, and runs a custom Dijkstra priority queue for pathfinding.
+* **Database:** MongoDB (via native driver) stores the dynamic state like user-reported complaints and saved planner scenarios.
+* **AI Integration:** Google Gemini (2.0-flash / 3-flash) handles the unstructured data analysis (Complaint Triaging, Daily Brief Generation, Route Explanations).
+
+---
+
+## 🚀 How to Run Locally
+
+**Prerequisites:** Node.js (v18+)
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Environment Variables:**
+   Create a `.env.local` file in the root directory. You must provide a Google Gemini API key:
+   ```env
+   GEMINI_API_KEY=your_studio_key_here
+   ```
+   *(Note: The app is configured to use mock-authentication for the hackathon demo to allow judges to easily switch between the Citizen, Operator, and Planner modes)*
+
+3. **Start the Development Server:**
+   ```bash
+   npm run dev
+   ```
+   
+4. **Access the App:**
+   Open `http://localhost:3000` in your browser. Use the header dropdown to toggle between the three platform roles!
