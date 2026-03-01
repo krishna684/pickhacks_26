@@ -64,3 +64,38 @@ This project was hand-built during the hackathon using a modern JS stack.
    
 4. **Access the App:**
    Open `http://localhost:3000` in your browser. Use the header dropdown to toggle between the three platform roles!
+
+---
+
+## ▲ Deploy on Vercel
+
+This repo is now configured for Vercel with:
+- API function entrypoint at `api/index.ts`
+- Frontend static build from Vite (`dist/`)
+- Routing rules in `vercel.json`
+
+### Steps
+
+1. Push this repo to GitHub.
+2. Import the repo into Vercel.
+3. Framework preset: **Other** (or Vite, both work with this config).
+4. Build command: `npm run build`
+5. Output directory: `dist`
+6. Deploy.
+
+### Required Environment Variables (Vercel Project Settings)
+
+- `GEMINI_API_KEY`
+- `MONGODB_URI`
+- `WEBHOOK_SIGNING_SECRET`
+- `VITE_AUTH0_DOMAIN`
+- `VITE_AUTH0_CLIENT_ID`
+- `VITE_AUTH0_ROLE_CLAIM`
+- `VITE_AUTH0_AUDIENCE` (optional)
+
+### Auth0 Callback/Logout URLs
+
+After you get your Vercel domain, add it in Auth0 Application settings:
+- Allowed Callback URLs: `https://<your-vercel-domain>`
+- Allowed Logout URLs: `https://<your-vercel-domain>`
+- Allowed Web Origins: `https://<your-vercel-domain>`

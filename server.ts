@@ -3,15 +3,13 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import path from "path";
 import { fileURLToPath } from "url";
+import net from "node:net";
 import type { NextFunction, Request, Response } from "express";
 import dotenv from "dotenv";
 import { MongoClient, Db } from "mongodb";
-import Database from "better-sqlite3";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
-
-const sqliteDb = new Database("civicsafe.db");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +25,31 @@ const rateLimitState = new Map<string, { count: number; windowStart: number }>()
 
 let mongoClient: MongoClient;
 let db: Db;
+let mongoInitialized = false;
+
+async function isPortAvailable(port: number, host = "0.0.0.0") {
+  return new Promise<boolean>((resolve) => {
+    const tester = net.createServer();
+
+    tester.once("error", () => resolve(false));
+    tester.once("listening", () => {
+      tester.close(() => resolve(true));
+    });
+
+    tester.listen(port, host);
+  });
+}
+
+async function findOpenPort(preferredPort: number, maxAttempts = 30) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const candidate = preferredPort + attempt;
+    if (await isPortAvailable(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(`Unable to find an open port in range ${preferredPort}-${preferredPort + maxAttempts - 1}.`);
+}
 
 function errorResponse(code: string, message: string, details?: Record<string, unknown>) {
   return {
@@ -472,6 +495,8 @@ async function seedPlannerScenariosIfEmpty() {
 }
 
 async function initializeMongo() {
+  if (mongoInitialized) return;
+
   const mongoUri = process.env.MONGODB_URI;
   if (!isNonEmptyString(mongoUri, 2000)) {
     throw new Error("MONGODB_URI is required in .env.local to run this server.");
@@ -497,9 +522,17 @@ async function initializeMongo() {
   await seedSegmentsIfEmpty();
   await seedComplaintsIfEmpty();
   await seedPlannerScenariosIfEmpty();
+
+  mongoInitialized = true;
 }
 
-async function startServer() {
+type ServerStartOptions = {
+  listen?: boolean;
+  includeFrontend?: boolean;
+};
+
+export async function startServer(options: ServerStartOptions = {}) {
+  const { listen = true, includeFrontend = true } = options;
   await initializeMongo();
 
   const app = express();
@@ -1196,88 +1229,6 @@ async function startServer() {
     }
   });
 
-  // Priority Queue for Dijkstra
-  class PriorityQueue {
-    values: any[] = [];
-    enqueue(val: any, priority: number) {
-      this.values.push({ val, priority });
-      this.sort();
-    }
-    dequeue() { return this.values.shift(); }
-    sort() { this.values.sort((a, b) => a.priority - b.priority); }
-    isEmpty() { return this.values.length === 0; }
-  }
-
-  function getNearestNodes(lat: number, lon: number, limit = 10) {
-    return sqliteDb.prepare(`
-      SELECT id, 
-        ((lat - ?) * (lat - ?) + (lon - ?) * (lon - ?)) as dist_sq
-      FROM route_nodes
-      ORDER BY dist_sq ASC
-      LIMIT ?
-    `).all(lat, lat, lon, lon, limit) as any[];
-  }
-
-  function runDijkstra(startId: string, endId: string, isSafest: boolean) {
-    const nodes = new PriorityQueue();
-    const distances: Record<string, number> = {};
-    const previous: Record<string, { node: string, edge: any } | null> = {};
-
-    // The Loop is small (~2-3k edges) so load in memory
-    const allEdges = sqliteDb.prepare("SELECT * FROM route_edges").all() as any[];
-    const graph: Record<string, any[]> = {};
-
-    allEdges.forEach(e => {
-      if (!graph[e.source]) graph[e.source] = [];
-      graph[e.source].push(e);
-      if (distances[e.source] === undefined) distances[e.source] = Infinity;
-      if (distances[e.target] === undefined) distances[e.target] = Infinity;
-    });
-
-    if (distances[startId] === undefined || distances[endId] === undefined) return null;
-
-    distances[startId] = 0;
-    nodes.enqueue(startId, 0);
-    previous[startId] = null;
-
-    while (!nodes.isEmpty()) {
-      const smallest = nodes.dequeue();
-      if (!smallest) break;
-      const current = smallest.val;
-
-      if (current === endId) {
-        const pathEdges = [];
-        let curr = endId;
-        while (previous[curr]) {
-          const prevInfo = previous[curr]!;
-          pathEdges.push(prevInfo.edge);
-          curr = prevInfo.node;
-        }
-        return pathEdges.reverse();
-      }
-
-      if (smallest.priority <= distances[current] && graph[current]) {
-        for (const neighbor of graph[current]) {
-          let cost = neighbor.distance;
-          if (isSafest) {
-            const penalty = (100 - neighbor.safety_score) * 2;
-            cost += penalty;
-          }
-
-          const candidate = distances[current] + cost;
-          const nextNode = neighbor.target;
-
-          if (candidate < (distances[nextNode] ?? Infinity)) {
-            distances[nextNode] = candidate;
-            previous[nextNode] = { node: current, edge: neighbor };
-            nodes.enqueue(nextNode, candidate);
-          }
-        }
-      }
-    }
-    return null;
-  }
-
   app.post("/api/routes", async (req, res) => {
     const { from, to } = req.body as { from?: string; to?: string };
 
@@ -1503,26 +1454,42 @@ async function startServer() {
     }
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    app.use(express.static(path.join(__dirname, "dist")));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+  if (includeFrontend) {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      app.use(express.static(path.join(__dirname, "dist")));
+      app.get("*", (_req, res) => {
+        res.sendFile(path.join(__dirname, "dist", "index.html"));
+      });
+    }
+  }
+
+  if (listen) {
+    const fixedPortFromEnv = Number(process.env.PORT);
+    const PORT = Number.isFinite(fixedPortFromEnv)
+      ? fixedPortFromEnv
+      : await findOpenPort(3000);
+
+    if (!Number.isFinite(fixedPortFromEnv) && PORT !== 3000) {
+      console.warn(`Port 3000 is busy, using port ${PORT} instead.`);
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   }
 
-  const PORT = 3000;
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  return app;
 }
 
-startServer().catch((error) => {
-  console.error("Failed to start server:", error);
-  process.exit(1);
-});
+if (!process.env.VERCEL) {
+  startServer().catch((error) => {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  });
+}
