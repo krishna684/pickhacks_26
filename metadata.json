@@ -1,0 +1,5 @@
+{
+  "name": "CivicSafe AI",
+  "description": "City Safety Copilot for citizens and planners. AI-powered safe routing, complaint triage, and safety heatmaps.",
+  "requestFramePermissions": ["geolocation"]
+}
